@@ -54,6 +54,7 @@ struct DirectoryEntry dir[16];
 
 int main()
 {
+  int i;
   int check = 1;
   char *cmd_str = (char *)malloc(MAX_COMMAND_SIZE);
   int16_t BPB_BytsPerSec;
@@ -141,6 +142,23 @@ int main()
       printf("BPB_NumFATs: %d\n", BPB_NumFATs);
       printf("BPB_FATSz32: %d\n", BPB_FATSz32);
     }
+    else if (strcmp(token[0], "ls") == 0)
+    {
+      /*
+       * ***********************************************************
+       * ****************************************
+       * 
+      */
+      fseek(fp, 0x100400, SEEK_SET);
+      fread(dir, 16, sizeof(struct DirectoryEntry), fp);
+      for (i = 0; i < 16; i++)
+      {
+        if ((dir[i].DIR_Attr == 0x01 || dir[i].DIR_Attr == 0x10 || dir[i].DIR_Attr == 0x20))
+        {
+          printf("Filename: %s %d %d\n", dir[i].DIR_Name, dir[i].DIR_FileSize, dir[i].DIR_FirstClusterLow);
+        }
+      }
+    }
     else if (strcmp(token[0], "close") == 0)
     {
       fclose(fp);
@@ -149,6 +167,7 @@ int main()
     {
       check = 0;
     }
+
     free(working_root);
   }
 
