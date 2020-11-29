@@ -54,7 +54,7 @@ struct DirectoryEntry dir[16];
 
 int main()
 {
-
+  int check = 1;
   char *cmd_str = (char *)malloc(MAX_COMMAND_SIZE);
   int16_t BPB_BytsPerSec;
   int8_t BPB_SecPerClus;
@@ -62,7 +62,7 @@ int main()
   int16_t BPB_NumFATs;
   int16_t BPB_FATSz32;
 
-  while (1)
+  while (check)
   {
     // Print out the mfs prompt
     printf("mfs> ");
@@ -140,6 +140,14 @@ int main()
       printf("BPB_RsvdSecCnt: %d\n", BPB_RvsdSecCnt); //32
       printf("BPB_NumFATs: %d\n", BPB_NumFATs);
       printf("BPB_FATSz32: %d\n", BPB_FATSz32);
+    }
+    else if (strcmp(token[0], "close") == 0)
+    {
+      fclose(fp);
+    }
+    else if (strcmp(token[0], "quit") == 0)
+    {
+      check = 0;
     }
     free(working_root);
   }
