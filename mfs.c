@@ -136,11 +136,11 @@ int main()
     }
     else if (strcmp(token[0], "bpb") == 0)
     {
-      printf("BPB_BytsPerSec: %d\n", BPB_BytsPerSec); //512
-      printf("BPB_SecPerClus: %d\n", BPB_SecPerClus); //1
-      printf("BPB_RsvdSecCnt: %d\n", BPB_RvsdSecCnt); //32
-      printf("BPB_NumFATs: %d\n", BPB_NumFATs);
-      printf("BPB_FATSz32: %d\n", BPB_FATSz32);
+      printf("BPB_BytsPerSec: %d\nBPB_BytsPerSec: %.4x\n", BPB_BytsPerSec, BPB_BytsPerSec); //512
+      printf("BPB_SecPerClus: %d\nBPB_SecPerClus: %.4x\n", BPB_SecPerClus, BPB_FATSz32);    //1
+      printf("BPB_RsvdSecCnt: %d\nBPB_RsvdSecCnt: %.4x\n", BPB_RvsdSecCnt, BPB_FATSz32);    //32
+      printf("BPB_NumFATs: %d\nBPB_NumFATs: %.4x\n", BPB_NumFATs, BPB_FATSz32);
+      printf("BPB_FATSz32: %d\nBPB_FATSz32: %.4x\n", BPB_FATSz32, BPB_FATSz32);
     }
     else if (strcmp(token[0], "ls") == 0)
     {
