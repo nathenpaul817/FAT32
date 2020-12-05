@@ -32,12 +32,12 @@
 #include <stdint.h>
 #include <ctype.h>
 
-#define ATTR_READ_ONLY 0x01
-#define ATTR_HIDDEN    0x02
-#define ATTR_SYSTEM    0x04
-#define ATTR_VOLUME_ID 0x08
-#define ATTR_DIRECTORY 0x10
-#define ATTR_ARCHIVE   0x20 
+#define ATTR_READ_ONLY  0x01
+#define ATTR_HIDDEN     0x02
+#define ATTR_SYSTEM     0x04
+#define ATTR_VOLUME_ID  0x08
+#define ATTR_DIRECTORY  0x10
+#define ATTR_ARCHIVE    0x20
 
 #define MAX_NUM_ARGUMENTS 4
 #define NUM_ENTRIES 16
@@ -59,6 +59,7 @@ struct __attribute__((__packed__)) DirectoryEntry
   uint16_t DIR_FirstClusterLow;
   uint32_t DIR_FileSize;
 };
+
 struct DirectoryEntry dir[16];
 
 int16_t BPB_BytsPerSec;
@@ -77,7 +78,7 @@ int32_t LBATOFFset(int32_t sector)
 
 int16_t NextLB(int32_t sector)
 {
-  uint32_t FATAddress = (BPB_BytsPerSec * BPB_RsvdSecCnt) + (BPB_NumFATs * BPB_FATSz32 * BPB_BytsPerSec) + (BPB_RsvdSecCnt * BPB_BytsPerSec);
+  uint32_t FATAddress = (BPB_BytsPerSec * BPB_RsvdSecCnt) + (sector * 4) ;
   int16_t val;
   fseek(fp, FATAddress, SEEK_SET);
   fread(&val, 2, 1, fp);
@@ -105,31 +106,64 @@ int compare(char *userString, char *directoryString)
   strncpy(input, userString, strlen(userString));
 
   char expanded_name[12];
-  memset(expanded_name,' ', 12);
-  
-  char *token = strtok(input,".");
+  memset(expanded_name, ' ', 12);
 
+  char *token = strtok(input, ".");
+
+  strncpy(expanded_name, token, strlen(token));
   token = strtok(NULL, ".");
 
-  if(token)
+  if (token)
   {
-    strncpy((char*)(expanded_name+8), token, strlen(token));
+    strncpy((char*)(expanded_name + 8), token, strlen(token));
   }
 
   expanded_name[11] = '\0';
 
   int i;
-  for(i = 0; i < 11; i++)
+  for (i = 0; i < 11; i++)
   {
     expanded_name[i] = toupper(expanded_name[i]);
   }
 
-  if(strncmp(expanded_name, IMG_Name, 11) == 0)
+  if (strncmp(expanded_name, IMG_Name, 11) == 0)
   {
     return 1;
   }
 
-  return 0 ;
+  return 0;
+}
+
+int cd(char *directoryName)
+{
+  int i;
+  int find = 0;
+  for (i = 0; i < NUM_ENTRIES; i++)
+  {
+    if (compare(directoryName, dir[i].DIR_Name))
+    {
+      int cluster = dir[i].DIR_FirstClusterLow;
+
+      if (cluster == 0)
+      {
+        cluster = 2;
+      }
+
+      int offset = LBATOFFset(cluster);
+      fseek(fp, offset, SEEK_SET);
+
+      fread(dir, sizeof(struct DirectoryEntry), NUM_ENTRIES, fp);
+
+      find = 1;
+      break;
+    }
+  }
+  if (!find)
+  {
+    printf("Directory cannot be found.\n");
+    return -1;
+  }
+  return 0;
 }
 
 int main()
@@ -194,10 +228,18 @@ int main()
 
     free( working_root );*/
     FILE *fp;
-    if (token[0] != NULL && token[1] != NULL && strcmp(token[0], "open") == 0)
+    if (strcmp(token[0], "open") == 0)
     {
       fp = fopen(token[1], "r");
-
+      if(fp == NULL)
+      {
+        printf("File cannot be open");
+      }
+      else
+      {
+        file_open = 1;
+      }
+      
       //We use SEEK_SET for this one
       fseek(fp, 11, SEEK_SET);
       fread(&BPB_BytsPerSec, 2, 1, fp);
@@ -213,6 +255,9 @@ int main()
 
       fseek(fp, 36, SEEK_SET);
       fread(&BPB_FATSz32, 4, 1, fp);
+
+      file_open = 1;
+      
     }
     else if (strcmp(token[0], "bpb") == 0 || strcmp(token[0], "info") == 0)
     {
@@ -230,12 +275,23 @@ int main()
 
       fseek(fp, 0x100400, SEEK_SET);
       fread(dir, 16, sizeof(struct DirectoryEntry), fp);
-      for (i = 0; i < 16; i++)
+      for (i = 0; i < NUM_ENTRIES; i++)
       {
         if ((dir[i].DIR_Attr == 0x01 || dir[i].DIR_Attr == 0x10 || dir[i].DIR_Attr == 0x20))
         {
-          printf("Filename: %s %d %d\n", dir[i].DIR_Name, dir[i].DIR_FileSize, dir[i].DIR_FirstClusterLow);
+          printf("%s %d %d\n", dir[i].DIR_Name, dir[i].DIR_FileSize, dir[i].DIR_FirstClusterLow);
         }
+      }
+    }
+    else if (strcmp(token[0], "cd") == 0)
+    {
+      if (file_open)
+      {
+        cd(token[1]);
+      }
+      else
+      {
+        printf("File Could Not Be Opened: ERROR\n");
       }
     }
     else if (strcmp(token[0], "close") == 0)
