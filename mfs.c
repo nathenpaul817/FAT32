@@ -30,8 +30,17 @@
 #include <string.h>
 #include <signal.h>
 #include <stdint.h>
+#include <ctype.h>
 
-#define MAX_NUM_ARGUMENTS 3
+#define ATTR_READ_ONLY 0x01
+#define ATTR_HIDDEN    0x02
+#define ATTR_SYSTEM    0x04
+#define ATTR_VOLUME_ID 0x08
+#define ATTR_DIRECTORY 0x10
+#define ATTR_ARCHIVE   0x20 
+
+#define MAX_NUM_ARGUMENTS 4
+#define NUM_ENTRIES 16
 
 #define WHITESPACE " \t\n" // We want to split our command line up into tokens \
                            // so we need to define what delimits our tokens.   \
@@ -51,6 +60,77 @@ struct __attribute__((__packed__)) DirectoryEntry
   uint32_t DIR_FileSize;
 };
 struct DirectoryEntry dir[16];
+
+int16_t BPB_BytsPerSec;
+int8_t BPB_SecPerClus;
+int16_t BPB_RsvdSecCnt;
+int8_t BPB_NumFATs;
+int32_t BPB_FATSz32;
+
+FILE *fp;
+int file_open = 0;
+
+int32_t LBATOFFset(int32_t sector)
+{
+  return ((sector - 2) * BPB_BytsPerSec) + (BPB_NumFATs * BPB_FATSz32 * BPB_BytsPerSec) + (BPB_RsvdSecCnt * BPB_BytsPerSec);
+}
+
+int16_t NextLB(int32_t sector)
+{
+  uint32_t FATAddress = (BPB_BytsPerSec * BPB_RsvdSecCnt) + (BPB_NumFATs * BPB_FATSz32 * BPB_BytsPerSec) + (BPB_RsvdSecCnt * BPB_BytsPerSec);
+  int16_t val;
+  fseek(fp, FATAddress, SEEK_SET);
+  fread(&val, 2, 1, fp);
+  return val;
+}
+
+int compare(char *userString, char *directoryString)
+{
+  char *dotcom = "..";
+  if (strncmp(dotcom, userString, 2) == 0)
+  {
+    if (strncmp(userString, directoryString, 2) == 0)
+    {
+      return 1;
+    }
+    return 0;
+  }
+
+  char IMG_Name[12];
+  strncpy(IMG_Name, directoryString, 11);
+  IMG_Name[11] = '\0';
+
+  char input[11];
+  memset(input, 0, 11);
+  strncpy(input, userString, strlen(userString));
+
+  char expanded_name[12];
+  memset(expanded_name,' ', 12);
+  
+  char *token = strtok(input,".");
+
+  token = strtok(NULL, ".");
+
+  if(token)
+  {
+    strncpy((char*)(expanded_name+8), token, strlen(token));
+  }
+
+  expanded_name[11] = '\0';
+
+  int i;
+  for(i = 0; i < 11; i++)
+  {
+    expanded_name[i] = toupper(expanded_name[i]);
+  }
+
+  if(strncmp(expanded_name, IMG_Name, 11) == 0)
+  {
+    return 1;
+  }
+
+  return 0 ;
+}
 
 int main()
 {
@@ -134,7 +214,7 @@ int main()
       fseek(fp, 36, SEEK_SET);
       fread(&BPB_FATSz32, 4, 1, fp);
     }
-    else if (strcmp(token[0], "bpb") == 0)
+    else if (strcmp(token[0], "bpb") == 0 || strcmp(token[0], "info") == 0)
     {
       printf("BPB_BytsPerSec: %d\nBPB_BytsPerSec: %.4x\n", BPB_BytsPerSec, BPB_BytsPerSec); //512
       printf("BPB_SecPerClus: %d\nBPB_SecPerClus: %.4x\n", BPB_SecPerClus, BPB_FATSz32);    //1
@@ -142,13 +222,12 @@ int main()
       printf("BPB_NumFATs: %d\nBPB_NumFATs: %.4x\n", BPB_NumFATs, BPB_FATSz32);
       printf("BPB_FATSz32: %d\nBPB_FATSz32: %.4x\n", BPB_FATSz32, BPB_FATSz32);
     }
+    else if (strcmp(token[0], "stat") == 0)
+    {
+    }
     else if (strcmp(token[0], "ls") == 0)
     {
-      /*
-       * ***********************************************************
-       * ****************************************
-       * 
-      */
+
       fseek(fp, 0x100400, SEEK_SET);
       fread(dir, 16, sizeof(struct DirectoryEntry), fp);
       for (i = 0; i < 16; i++)
@@ -167,8 +246,9 @@ int main()
     {
       check = 0;
     }
+    else
 
-    free(working_root);
+      free(working_root);
   }
 
   return 0;
