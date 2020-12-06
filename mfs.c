@@ -162,17 +162,17 @@ int ls()
   return 0;
 }
 
-int cd( char * directoryName)
+int cd(char *directoryName)
 {
   int i;
   int found = 0;
-  for(i = 0; i < NUM_ENTRIES; i++)
+  for (i = 0; i < NUM_ENTRIES; i++)
   {
-    if(compare(directoryName, dir[i].DIR_Name))
+    if (compare(directoryName, dir[i].DIR_Name))
     {
       int cluster = dir[i].DIR_FirstClusterLow;
 
-      if(cluster == 0)
+      if (cluster == 0)
       {
         cluster = 2;
       }
@@ -180,16 +180,96 @@ int cd( char * directoryName)
       fseek(fp, offset, SEEK_SET);
 
       fread(dir, sizeof(struct DirectoryEntry), NUM_ENTRIES, fp);
-      
+
       found = 1;
       break;
     }
   }
-  if(!found)
+  if (!found)
   {
     printf("Error Directory Wasn't found\n");
     return -1;
   }
+  return 0;
+}
+
+int readfile(char *filename, int requestedOffset, int requestedBytes)
+{
+  int i;
+  int found = 0;
+  int bytesRemainingToRead = requestedBytes;
+
+  if (requestedOffset < 0)
+  {
+    printf("Error: Offset is less than zero");
+  }
+
+  for (i = 0; i < NUM_ENTRIES; i++)
+  {
+    if (compare(filename, dir[i].DIR_Name))
+    {
+      int cluster = dir[i].DIR_FirstClusterLow;
+
+      found = 1;
+
+      int searchSize = requestedOffset;
+
+      while (searchSize >= BPB_BytsPerSec)
+      {
+        cluster = NextLB(cluster);
+        searchSize = searchSize - BPB_BytsPerSec;
+      }
+
+      int offset = LBAToOffset(cluster);
+      int byteOffset = (requestedOffset % BPB_BytsPerSec);
+      fseek(fp, offset + byteOffset, SEEK_SET);
+
+      unsigned char buffer[BPB_BytsPerSec];
+
+      int firstblockbytes = BPB_BytsPerSec - requestedOffset;
+      fread(buffer, 1, firstblockbytes, fp);
+
+      for (i = 0; i < firstblockbytes; i++)
+      {
+        printf("%x ", buffer[i]);
+      }
+
+      bytesRemainingToRead = bytesRemainingToRead - firstblockbytes;
+
+      while (bytesRemainingToRead >= 512)
+      {
+        cluster = NextLB(cluster);
+        offset = LBAToOffset(cluster);
+        fseek(fp, offset, SEEK_SET);
+        fread(buffer, 1, BPB_BytsPerSec, fp);
+
+        for (i = 0; i < BPB_BytsPerSec; i++)
+        {
+          printf("%x ", buffer[i]);
+        }
+        bytesRemainingToRead = bytesRemainingToRead - BPB_BytsPerSec;
+      }
+
+      if (bytesRemainingToRead)
+      {
+        cluster = NextLB(cluster);
+        offset = LBAToOffset(cluster);
+        fseek(fp, offset, SEEK_SET);
+        fread(buffer, 1, BPB_BytsPerSec, fp);
+
+        for (i = 0; i < bytesRemainingToRead; i++)
+        {
+          printf("%x ", buffer[i]);
+        }
+      }
+      printf("\n");
+    }
+  }
+    if (!found)
+    {
+      printf("Error: File was not Found\n");
+      return -1;
+    }
   return 0;
 }
 
@@ -320,7 +400,17 @@ int main()
         printf("ERROR: File Image Not Open\n");
       }
     }
-
+    else if (strcmp(token[0], "read") == 0)
+    {
+      if (file_open)
+      {
+        readfile(token[1], atoi(token[2]), atoi(token[3]));
+      }
+      else
+      {
+        printf("ERROR: File Image Not Open\n");
+      }
+    }
     free(working_root);
   }
   return 0;
